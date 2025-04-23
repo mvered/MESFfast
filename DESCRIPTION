@@ -1,0 +1,12 @@
+Package: MESFfast
+Title: Faster Implementation of Moran Eigenvector Spatial Filtering
+Version: 0.0.0.9000
+Authors@R: 
+    person("Michelle", "Vered", , "me@michellevered.com", role = c("aut", "cre"))
+Description: This package combines other tools and packages to more efficiently 
+and quickly implement Moran Eigenvector Spatial Filtering (MESF) for larger data
+sets. MESF is a useful tool for addressing spatial autocorrelation. 
+License: `use_mit_license()`
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
