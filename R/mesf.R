@@ -3,6 +3,7 @@
 # ME function from spatial reg originally copyright 2005-2008
 # by Roger Bivand and Pedro Peres-Neto (from Matlab)
 
+
 #' Performs Moran eigenvector spatial filtering
 #'
 #' @param formula a symbolic description of the regression model to be fit
@@ -18,6 +19,7 @@
 #' @param verbose if TRUE prints messages indicating progress in model fitting
 #' @param zero.policy if FALSE stop with error for any empty neighbor sets, if TRUE permit the weights list to be formed with zero-length weights vectors
 #' @param n_eigs limit testing of which moran eigenvectors to include in regression model to the n_eigs eigenvectors of the spatial weights matrix with the largest magnitude
+#' @param parallel whether to parallelize testing of moran eigenvectors, default is TRUE
 #'
 #' @description
 #' Quickly performs Moran eigenvector spatial filtering (MESF). MESF involves
@@ -45,31 +47,21 @@
 #' matrix. This speeds up the process by only computing the smaller number of
 #' eigenvectors we are going to consider (using the RSpectra package) and by
 #' requiring us to test fewer eigenvectors in the model re-fitting stage.
+#' 4. Running the search for eigenvectors to add to the model in parallel instead
+#' of sequentially.
 #'
 #' @export
 mesf <- function(formula, data=list(), lat, lon, family = gaussian,
                  weights, offset, na.action=na.fail,
                  listw=NULL, alpha=0.05, verbose=NULL,
-                 zero.policy=NULL, n_eigs = 100) {
+                 zero.policy=NULL, n_eigs = 100, parallel=TRUE) {
 
-  #### running in parallel
+  #### code for running in parallel
   cores <- parallel::detectCores()
-  if (is.null(cores)) {
-    parallel <- "no"
-  } else {
-    parallel <- ifelse (spatialreg::get.mcOption(), "multicore", "snow")
-  }
+  ncpus <- ifelse(parallel, cores-1, 1L)
 
-  ncpus <- ifelse(is.null(cores), 1L, cores-1)
-  cl <- NULL
-  if (parallel == "snow") {
-    cl <- spatialreg::get.ClusterOption()
-    if (is.null(cl)) {
-      parallel <- "no"
-      warning("no cluster in ClusterOption, parallel set to no")
-    }
-  }
-  par_boot_args <- list(parallel=parallel, ncpus=ncpus, cl=cl)
+  # functions for running in parallel differ by platform
+  use_mclapply <- .Platform$OS.type != "windows"
   #####
 
   ##### handle missing arguments & defaults
@@ -153,11 +145,11 @@ mesf <- function(formula, data=list(), lat, lon, family = gaussian,
   if (verbose) cat("doubly centering CWC matrix \n")
   R <- matrix(0,ncol=n, nrow=n) + Rfast::rowmeans(Wmat)
   if (verbose) cat("got rowmeans, now calculating col means \n")
-  C <- matrix(0,ncol=n, nrow=n) + Rfast::colmeans(Wmat, parallel=TRUE, cores=ncpus)
+  C <- matrix(0,ncol=n, nrow=n) + Rfast::colmeans(Wmat, parallel=parallel, cores=ncpus)
   if (verbose) cat("got colmeans, now taking transpose \n")
   C <- Rfast::transpose(C)
   if (verbose) cat("getting mean of whole matrix \n")
-  rowsums <- Rfast::rowsums(Wmat, parallel=TRUE, cores=ncpus)
+  rowsums <- Rfast::rowsums(Wmat, parallel=parallel, cores=ncpus)
   grandsum <- sum(rowsums)
   if (verbose) cat("combining row and colmean info to add to grand mean \n")
   CWC <- Wmat - R - C + grandsum/n
@@ -174,17 +166,43 @@ mesf <- function(formula, data=list(), lat, lon, family = gaussian,
   rm(CWC)
   ####
 
+
+  ### internal function for parallelization
+  # tests adding a particular eigenvector to the model, re-calculates moran's I
+  test_eig <- function(i) {
+    iX <- cbind(X, eV[, i])
+    i_glm <- stats::glm.fit(x = iX, y = Y, weights = weights, offset = offset, family = family)
+    glm_res <- i_glm$y - i_glm$fitted.values
+    return(moranfast(glm_res, lat, lon)$observed)
+  }
+  ###
+
   ### fit model with each eigenvector to find the first eigenvector to add
   if (verbose) cat("looking for best eigenvector for eig1 \n")
-  iZ <- numeric(n_eigs)
-  for (i in 1:n_eigs) {
-    iX <- cbind(X, eV[,i])
-    i_glm <- stats::glm.fit(x=iX, y=Y, weights=weights, offset=offset,
-                     family=family)
-    glm_res <- i_glm$y - i_glm$fitted.values
-    iZ[i] <- moranfast(glm_res, lat, lon)$observed
+  if (parallel == FALSE){
+    iZ <- numeric(n_eigs)
+    for (i in 1:n_eigs) {
+      iX <- cbind(X, eV[,i])
+      i_glm <- stats::glm.fit(x=iX, y=Y, weights=weights, offset=offset,
+                              family=family)
+      glm_res <- i_glm$y - i_glm$fitted.values
+      iZ[i] <- moranfast(glm_res, lat, lon)$observed
+    }
   }
-  min_iZ <- which.min(abs(iZ))
+  else if (use_mclapply) {
+    # parallel execution: Unix-like (Linux/Mac): use mclapply
+    iZ_list <- parallel::mclapply(1:n_eigs, test_eig, mc.cores = ncpus)
+    iZ <- unlist(iZ_list)
+  } else {
+    # parallel execution: Windows: use parLapply
+    cl <- parallel::makeCluster(ncpus)
+    parallel::clusterExport(cl, varlist = c("X", "eV", "Y", "weights", "offset", "family", "lat", "lon", "moranfast"), envir = environment())
+    iZ_list <- parallel::parLapply(cl, 1:n_eigs, test_eig)
+    parallel::stopCluster(cl)
+    iZ <- unlist(iZ_list)
+  }
+  min_iZ <- which.min(abs(iZ))  # Find minimum
+
   ####
 
   ### add first eigenvector to list of xs and refit model
@@ -209,17 +227,36 @@ mesf <- function(formula, data=list(), lat, lon, family = gaussian,
       if (verbose) cat("all eigs used \n")
       break
     }
-    for (i in 1:n_eigs) {
-      if (used[i]==FALSE) {
-        iX <- cbind(X, eV[,i])
-        i_glm <- stats::glm.fit(x=iX, y=Y, weights=weights,
-                         offset=offset, family=family)
-        glm_res <- i_glm$y - i_glm$fitted.values
+    unused_indices <- which(!used)
+    if (parallel == FALSE){ # if computer can't do parallel
+      for (i in 1:n_eigs) {
+        if (used[i]==FALSE) {
+          iX <- cbind(X, eV[,i])
+          i_glm <- stats::glm.fit(x=iX, y=Y, weights=weights,
+                           offset=offset, family=family)
+          glm_res <- i_glm$y - i_glm$fitted.values
 
-        iZ[i] <- moranfast(glm_res, lat, lon)$observed
-      } else iZ[i] <- NA
+          iZ[i] <- moranfast(glm_res, lat, lon)$observed
+        } else iZ[i] <- NA
+      }
+    }
+    else if (use_mclapply){ # parallel for unix
+      iZ_partial <- unlist(parallel::mclapply(unused_indices, test_eig, mc.cores = ncpus))
+      iZ <- rep(NA, n_eigs)
+      iZ[unused_indices] <- iZ_partial
+    } else { # parallel for windows
+      cl <- parallel::makeCluster(ncpus)
+      parallel::clusterExport(cl, varlist = c("X", "eV", "Y", "weights", "offset", "family", "lat", "lon", "moranfast"), envir = environment())
+      iZ_partial <- unlist(parallel::parLapply(cl, unused_indices, test_eig,
+                                     X = X, eV = eV, Y = Y, weights = weights,
+                                     offset = offset, family = family,
+                                     lat = lat, lon = lon))
+      parallel::stopCluster(cl)
+      iZ <- rep(NA, n_eigs)
+      iZ[unused_indices] <- iZ_partial
     }
     min_iZ <- which.min(abs(iZ))
+
     X <- cbind(X, eV[, min_iZ])
     glm_fit <- stats::glm.fit(x=X, y=Y, weights=weights, offset=offset,
                        family=family)
@@ -246,10 +283,12 @@ mesf <- function(formula, data=list(), lat, lon, family = gaussian,
   res
 }
 
+#' @exportS3method
 print.Me_res <- function(x, ...) {
   print(x$selection)
 }
 
+#' @exportS3method
 fitted.Me_res <- function(object, ...) {
   if (is.null(object$na.action)) {
     res <- object$vectors
