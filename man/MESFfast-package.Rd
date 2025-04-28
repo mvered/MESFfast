@@ -34,9 +34,3 @@ Maintainer: Michelle Vered <me@michellevered.com>
 \seealso{
   mesf
 }
-\examples{
-  \dontrun{
-     ## Optional simple examples of the most important functions
-     ## These can be in \dontrun{} and \donttest{} blocks.
-  }
-}

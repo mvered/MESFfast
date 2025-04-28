@@ -17,7 +17,8 @@ mesf(
   alpha = 0.05,
   verbose = NULL,
   zero.policy = NULL,
-  n_eigs = 100
+  n_eigs = 100,
+  parallel = TRUE
 )
 }
 \arguments{
@@ -46,6 +47,8 @@ mesf(
 \item{zero.policy}{if FALSE stop with error for any empty neighbor sets, if TRUE permit the weights list to be formed with zero-length weights vectors}
 
 \item{n_eigs}{limit testing of which moran eigenvectors to include in regression model to the n_eigs eigenvectors of the spatial weights matrix with the largest magnitude}
+
+\item{parallel}{whether to parallelize testing of moran eigenvectors, default is TRUE}
 }
 \description{
 Quickly performs Moran eigenvector spatial filtering (MESF). MESF involves
@@ -74,5 +77,7 @@ to only the n_eigs largest eigenvectors of the transformed spatial weights
 matrix. This speeds up the process by only computing the smaller number of
 eigenvectors we are going to consider (using the RSpectra package) and by
 requiring us to test fewer eigenvectors in the model re-fitting stage.
+\item Running the search for eigenvectors to add to the model in parallel instead
+of sequentially.
 }
 }
