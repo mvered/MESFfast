@@ -39,6 +39,8 @@ until the p-value for Moran's I exceeds the specified stopping threshold alpha.
 library(MESFfast)
 library(sp)
 library(spdep)
+library(parallel)
+options(mc.cores=2)
 ```
 
 We will use data from Columbus, OH to demonstrate how to build a regression model
@@ -109,7 +111,8 @@ find_mesf <- mesf(crime ~ home_value + income,
                    data = columbus_sp,
                    family = gaussian,
                    listw = idw_weights, verbose = T, alpha = .05,
-                   n_eigs = 10, lat = columbus_sp$lat, lon = columbus_sp$lon)
+                   n_eigs = 10, lat = columbus_sp$lat, lon = columbus_sp$lon,
+                   parallel = FALSE) # we set parallel to false only for the purposes of the vignette
 ```
 
 If we look at the output from the function, we can preview the eigenvectors which
