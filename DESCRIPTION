@@ -7,9 +7,9 @@ Authors@R:
 Description: This package combines other tools and packages to more
     efficiently and quickly implement Moran Eigenvector Spatial Filtering
     (MESF) for larger data sets. MESF is a useful tool for addressing
-    spatial autocorrelation.  Credit to Matthew Cooper for functions
-    modified from the moranfast package and to Roger Bivand and Pedro
-    Peres-Neto for functions modified from the spatialreg package.
+    spatial autocorrelation. Credit to previous creators whose code was modified
+    and built upon for this package (Matthew Cooper for moranfast package and 
+    Roger Bivand and Pedro Peres-Neto for function ME from spatialreg package).
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
