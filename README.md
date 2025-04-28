@@ -34,23 +34,10 @@ computations from Rfast package which runs in parallel in C++.
 ```
 # installation
 library(devtools)
-install_github('mvered/MESFfast')
+devtools::install_github("mvered/MESFfast", build_vignettes = TRUE)
 
 
-# example use
-# for more detailed explanation, see vignette
-library(MESFfast)
-data(columbus_sp)
-neighbors <- dnearneigh(columbus_sp, d1 = 0.0001, d2 = 75) 
-idw_weights <- nb2listwdist(neighbors, columbus_sp, type = "idw", zero.policy=TRUE, style="W")
-find_mesf <- mesf(crime ~ home_value + income,
-                   data = columbus_sp,
-                   family = gaussian,
-                   listw = idw_weights, verbose = T, alpha = .05,
-                   n_eigs = 10, lat = columbus_sp$lat, lon = columbus_sp$lon)
-final_model <- glm(crime ~ home_value + income 
-                   + find_mesf$vectors[,1] + find_mesf$vectors[,2] + find_mesf$vectors[,3],
-                   data = columbus_sp)
-moranfast(final_model$residuals, lat=columbus_sp$lat, lon=columbus_sp$lon)
+# see vignette for use
+vignette("overview", package = "MESFfast")
 ```
 
