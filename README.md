@@ -1,4 +1,4 @@
-# MESFfast: Faster Moran Eigenvector Spatial Filtering (MESF)
+# MESFfast: Faster Moran Eigenvector Spatial Filtering
 
 Quickly performs Moran eigenvector spatial filtering (MESF). MESF involves
 removing/reducing spatial autocorrelation present in the residuals of
