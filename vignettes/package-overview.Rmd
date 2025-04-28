@@ -1,0 +1,144 @@
+---
+title: "package-overview"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{package-overview}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+
+# Moran Eigenvector Spatial Filtering
+
+## About
+
+The purpose of this package is to implement Moran Eigenvector Spatial Fitlering (MESF),
+a technique used for reducing spatial autocorrelation in generalized linear models (GLMs). 
+MESF searches eigenvectors of a transformed spatial weights matrix (a doubly 
+centered matrix). One-by-one, eigenvectors are added to the right-hand side of the 
+GLM and Moran's I statistic (a measure of spatial autocorrelation) is calculated 
+for the residuals of the newly fitted model. The eigenvector which produces the 
+lowest Moran's I is then permanently added to the model and the search process 
+repeated to choose additional eigenvectors to add to the model. This process continues 
+until the p-value for Moran's I exceeds the specified stopping threshold alpha.
+
+
+## Example Regression Problem
+
+```{r setup}
+
+# packages needed for demo
+library(MESFfast)
+library(sp)
+library(spdep)
+```
+
+We will use data from Columbus, OH to demonstrate how to build a regression model
+with MESF. In this model, we'll try to predict crime rates based on a neighborhood's
+average home value and household income level.
+
+The data set columbus_sp is provided in this package. It is a SpatialPointsDataFrame 
+object, with latitude and longitude columns. We'll load in the data set, then
+create a distance weighting matrix with weights based on the inverse distance
+between two points.
+
+```{r}
+
+# sample spatial data set with crime stats by neighborhood for Columbus, OH
+data(columbus_sp)
+```
+
+We first show what a model would look like without applying the MESF method. This
+model aims to predict crime rates using some attributes of the neighborhood: the
+average home value, and the distance of the neighborhood to the central business 
+district (downtown area). 
+
+```{r}
+
+# fit a standard linear model
+basic_model <- glm(crime ~ home_value + income, data = columbus_sp)
+summary(basic_model)
+```
+Both covariates are predictive of crime rates. But wait! Before we finalize our
+model, let's check for some potential issues. One concern with spatial data
+is spatial autocorrelation in the residuals, which can lead to biased parameter
+estimates and underestimation of standard errors.
+
+We can use a function from this package to assess spatial autocorrelation in the
+residuals. We calculate Moran's I statistic and the associated p-value. This test
+checks our data against the null hypothesis that the residuals from our regression
+model are randomly distributed, with no spatial clustering or dispersion.
+
+```{r}
+
+# calculate Moran's I
+moranfast(basic_model$residuals, lat=columbus_sp$lat, lon=columbus_sp$lon)
+```
+Possible values for Moran's I range from -1 (spatial dispersion) to 0 (random 
+distribution) to 1 (spatial clustering). We observe a Moran's I of around 
+$I=0.09$, which indicates a small degree of spatial clustering, meaning
+neighborhoods near one another are more likely to have residuals which are 
+similar to one another. There is extremely strong evidence 
+($p \approx 8\times10^{-7}$) that the observed Moran's I would not be generated
+through random variation in residuals.
+
+We can address this spatial autocorrelation in the residuals by applying the
+MESF method. We will test out the largest 10 eigenvectors of the spatial weights
+matrix. We do this in verbose mode so we can get better insight into what the
+function is doing as it runs.
+
+```{r}
+
+# identifies neighbors of points
+# looks for neighbors between 0.01 and 75 km away
+neighbors <- dnearneigh(columbus_sp, d1 = 0.0001, d2 = 75) 
+
+# create inverse distance based spatial weights for list of neighbors
+idw_weights <- nb2listwdist(neighbors, columbus_sp, type = "idw", zero.policy=TRUE, style="W")
+
+# find moran eigenvector spatial filters to use
+find_mesf <- mesf(crime ~ home_value + income,
+                   data = columbus_sp,
+                   family = gaussian,
+                   listw = idw_weights, verbose = T, alpha = .05,
+                   n_eigs = 10, lat = columbus_sp$lat, lon = columbus_sp$lon)
+```
+
+If we look at the output from the function, we can preview the eigenvectors which
+the fitting process has recommended to include in our final model.
+
+```{r}
+
+# preview the eigenvectors chosen
+head(find_mesf$vectors)
+```
+It looks like there are 3 eigenvectors we'd like to include in our final model.
+So we can re-fit our regression, adding in these eigenvectors to the right-hand
+side. 
+
+```{r}
+
+# refit regression
+final_model <- glm(crime ~ home_value + income 
+                   + find_mesf$vectors[,1] + find_mesf$vectors[,2] + find_mesf$vectors[,3],
+                   data = columbus_sp)
+summary(final_model)
+```
+Now we can check for the spatial autocorrelation in the residuals of our final model.
+
+```{r}
+
+# calculate Moran's I on final model
+moranfast(final_model$residuals, lat=columbus_sp$lat, lon=columbus_sp$lon)
+```
+We have reduced the Moran's I and note that the p-value exceeds the $\alpha$ threshold
+we set, which was 0.05.
+

@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 Michelle Vered
+MESFfast package Copyright (c) 2025 Michelle Vered
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+moranfast.R and calc_moran.cpp functions modified from moranfast R package, Copyright (c) 2025 Matthew Cooper, distributed under MIT license.
+
+ME_limited_eigs.R function modified from the ME function in the spatialreg package, distributed under the GPL-2 license.
