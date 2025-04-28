@@ -1,8 +1,8 @@
 ---
-title: "package-overview"
+title: "overview"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{package-overview}
+  %\VignetteIndexEntry{overview}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
