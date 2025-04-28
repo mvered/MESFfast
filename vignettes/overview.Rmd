@@ -33,14 +33,12 @@ until the p-value for Moran's I exceeds the specified stopping threshold alpha.
 
 ## Example Regression Problem
 
-```{r setup}
+```{r setup, message=FALSE}
 
 # packages needed for demo
-library(MESFfast)
 library(sp)
 library(spdep)
-library(parallel)
-options(mc.cores=2)
+library(MESFfast)
 ```
 
 We will use data from Columbus, OH to demonstrate how to build a regression model
